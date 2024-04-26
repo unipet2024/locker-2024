@@ -37,7 +37,7 @@ impl Claim {
         require_eq!(claimers.len(), locks.len(), LockerErrors::InputInvalid);
         self.claim_data = vec![];
 
-        for i in 0..claimers.len() - 1 {
+        for i in 0..claimers.len() {
             require_keys_neq!(claimers[i], Pubkey::default(), LockerErrors::AddressZero);
             self.claim_data.push(ClaimData {
                 claimer: claimers[i],
@@ -48,14 +48,17 @@ impl Claim {
         Ok(())
     }
 
-    pub fn set_tge(&mut self, tge: u64) {
+    pub fn set_tge(&mut self, tge: u64) -> Result<()> {
         self.start_time = tge;
         self.end_time = tge + self.vesting_month as u64;
 
         // set tge amount
         for claim_data in self.claim_data.iter_mut() {
-            claim_data.released = claim_data.lock * self.tge_release / 10000; // TGE RELEASE 2 DECIMALS
+            // claim_data.released = claim_data.lock * self.tge_release / 10000; // TGE RELEASE 2 DECIMALS
+            claim_data.lock -= claim_data.lock * self.tge_release / 10000;
         }
+
+        Ok(())
     }
 
     pub fn get_claim_index(&self, claimer: Pubkey) -> (usize, bool) {
@@ -94,8 +97,7 @@ impl Claim {
             let total_vesting_time = self.end_time - self.start_time;
             let released_time = self.released_times(current);
 
-            return (((claim_data.lock) * released_time) / total_vesting_time)
-                - claim_data.released;
+            return ((claim_data.lock * released_time) / total_vesting_time) - claim_data.released;
         }
     }
 }

@@ -77,7 +77,9 @@ pub fn user_claim_handle(ctx: Context<UserClaim>, claim_type: ClaimType) -> Resu
     require_gte!(current, claim_account.start_time, LockerErrors::StillLock);
 
     let (index, check) = claim_account.get_claim_index(claimer.key());
-    require_eq!(check, false, LockerErrors::NotAllowToClaim);
+    require_eq!(check, true, LockerErrors::NotAllowToClaim);
+
+    // require_eq!(1,2);
 
     let amount = claim_account.get_claim_amount(claimer.key(), current);
     require_gt!(amount, 0, LockerErrors::NothingToClaim);
