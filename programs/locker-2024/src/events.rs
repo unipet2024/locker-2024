@@ -12,6 +12,7 @@ pub struct SetAuthorityEvent {
 
 #[event]
 pub struct SetTgeEvent {
+    pub claim_type:ClaimType,
     pub operator: Pubkey,
     pub tge: u64,
     pub time: i64,

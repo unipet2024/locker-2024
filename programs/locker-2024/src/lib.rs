@@ -14,14 +14,14 @@ pub use instructions::*;
 pub use state::*;
 pub use types::*;
 
-declare_id!("8oUvgoQeCqB2ADoEBACvGtBz3w2jvVbzHXFSw72GrjEq");
+declare_id!("Ay5kbaQ1YojYTvoeKExWvCeyA77fNKtVuxSqbbctEUkq");
 
 #[program]
 pub mod locker_2024 {
     use super::*;
 
-    pub fn init(ctx: Context<InitLocker>, unp: Pubkey) -> Result<()> {
-        init_locker::init_handle(ctx, unp)
+    pub fn init(ctx: Context<InitLocker>) -> Result<()> {
+        InitLocker::init_handle(ctx)
     }
 
     pub fn set_authority(
@@ -34,45 +34,31 @@ pub mod locker_2024 {
 
     pub fn set_claim(
         ctx: Context<SetClaim>,
-        seed_round_pubkeys: Vec<Pubkey>,
-        seed_round_locks: Vec<u64>,
-        private_round_pubkeys: Vec<Pubkey>,
-        private_round_locks: Vec<u64>,
-        public_sale_pubkeys: Vec<Pubkey>,
-        public_sale_locks: Vec<u64>,
-        founding_team_pubkeys: Vec<Pubkey>,
-        founding_team_locks: Vec<u64>,
-        advisors_pubkeys: Vec<Pubkey>,
-        advisors_locks: Vec<u64>,
-        treasury_pubkeys: Vec<Pubkey>,
-        treasury_locks: Vec<u64>,
-        ecosystem_pubkeys: Vec<Pubkey>,
-        ecosystem_locks: Vec<u64>,
+        claim_type: ClaimType,
+        full_lock: u64,
+        vesting: u64,
+        tge_release: u16,
+        token: Pubkey,
+        claimers: Vec<Pubkey>,
+        locks: Vec<u64>,
     ) -> Result<()> {
-        set_claim::set_claim_handle(
+        SetClaim::set_claim_handle(
             ctx,
-            seed_round_pubkeys,
-            seed_round_locks,
-            private_round_pubkeys,
-            private_round_locks,
-            public_sale_pubkeys,
-            public_sale_locks,
-            founding_team_pubkeys,
-            founding_team_locks,
-            advisors_pubkeys,
-            advisors_locks,
-            treasury_pubkeys,
-            treasury_locks,
-            ecosystem_pubkeys,
-            ecosystem_locks,
+            claim_type,
+            full_lock,
+            vesting,
+            tge_release,
+            token,
+            claimers,
+            locks,
         )
     }
 
-    pub fn set_tge(ctx: Context<SetTge>, tge: u64) -> Result<()> {
-        set_tge::set_tge_handle(ctx, tge)
+    pub fn set_tge(ctx: Context<SetTge>, claim_type: ClaimType, tge: u64) -> Result<()> {
+        SetTge::set_tge_handle(ctx, claim_type, tge)
     }
 
     pub fn user_claim(ctx: Context<UserClaim>, claim_type: ClaimType) -> Result<()> {
-        user_claim::user_claim_handle(ctx, claim_type)
+        UserClaim::user_claim_handle(ctx, claim_type)
     }
 }

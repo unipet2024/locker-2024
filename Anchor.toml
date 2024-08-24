@@ -4,14 +4,14 @@
 seeds = false
 skip-lint = false
 
-[programs.localnet]
-locker_2024 = "8oUvgoQeCqB2ADoEBACvGtBz3w2jvVbzHXFSw72GrjEq"
+[programs.devnet]
+locker_2024 = "Ay5kbaQ1YojYTvoeKExWvCeyA77fNKtVuxSqbbctEUkq"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "Devnet"
 wallet = "/Users/tabatrung/.config/solana/id.json"
 
 [scripts]

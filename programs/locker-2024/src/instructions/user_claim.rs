@@ -4,11 +4,7 @@ use anchor_spl::{
     token::{Mint, Token, TokenAccount},
 };
 
-use crate::{
-    Claim, ClaimType, Locker, LockerErrors, UserClaimEvent, ADVISORS_ACCOUNT, ECOSYSTEM_ACCOUNT,
-    FOUNDING_TEAM_ACCOUNT, LOCKER_ACCOUNT, PRIVATE_ROUND_ACCOUNT, PUBLIC_SALE_ACCOUNT,
-    SEED_ROUND_ACCOUNT, TREASURY_ACCOUNT,
-};
+use crate::{Claim, ClaimType, LockerErrors, UserClaimEvent};
 
 use anchor_spl::{
     // associated_token::get_associated_token_address,
@@ -21,45 +17,29 @@ use anchor_spl::{
 )]
 pub struct UserClaim<'info> {
     #[account(
-        seeds = [LOCKER_ACCOUNT],
-        bump=locker.bump
-    )]
-    pub locker: Box<Account<'info, Locker>>,
-
-    #[account(
         mut,
         associated_token::mint = token_mint,
-        associated_token::authority = locker
+        associated_token::authority = claim_account
     )]
-    pub locker_ata: Account<'info, TokenAccount>,
+    pub claim_ata: Account<'info, TokenAccount>,
 
     #[account(
         mut,
-        seeds = [
-            match claim_type {
-                ClaimType::SeedRound => SEED_ROUND_ACCOUNT,
-                ClaimType::PrivateRound => PRIVATE_ROUND_ACCOUNT,
-                ClaimType::PublisSale => PUBLIC_SALE_ACCOUNT,
-                ClaimType::FoundingTeam => FOUNDING_TEAM_ACCOUNT,
-                ClaimType::Advisors => ADVISORS_ACCOUNT,
-                ClaimType::Treasury =>TREASURY_ACCOUNT,
-                ClaimType::Ecosystem =>ECOSYSTEM_ACCOUNT
-            }
-        ],
+        seeds = [claim_type.get_seeds()],
         bump=claim_account.bump,
     )]
     pub claim_account: Account<'info, Claim>,
 
     #[account(
         init_if_needed,
-        payer=claimer,
+        payer = user,
         associated_token::mint = token_mint,
-        associated_token::authority = claimer
+        associated_token::authority = user
     )]
-    pub claim_ata: Account<'info, TokenAccount>,
+    pub user_ata: Account<'info, TokenAccount>,
 
     #[account(mut, signer)]
-    pub claimer: Signer<'info>,
+    pub user: Signer<'info>,
 
     pub token_program: Program<'info, Token>,
     pub token_mint: Account<'info, Mint>,
@@ -67,57 +47,66 @@ pub struct UserClaim<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn user_claim_handle(ctx: Context<UserClaim>, claim_type: ClaimType) -> Result<()> {
-    let locker = &mut ctx.accounts.locker;
-    // let locker_ata = &mut ctx.accounts.locker_ata;
-    let claim_account = &mut ctx.accounts.claim_account;
-    let claimer = &mut ctx.accounts.claimer;
+impl UserClaim<'_> {
+    fn validate(&self) -> Result<()> {
+        let current = Clock::get()?.unix_timestamp as u64;
 
-    let current = Clock::get()?.unix_timestamp as u64;
-    require_gte!(current, claim_account.start_time, LockerErrors::StillLock);
+        require_gte!(self.claim_account.start_time, 0, LockerErrors::StillLock);
+        require_gte!(
+            current,
+            self.claim_account.start_time,
+            LockerErrors::StillLock
+        );
 
-    let (index, check) = claim_account.get_claim_index(claimer.key());
-    require_eq!(check, true, LockerErrors::NotAllowToClaim);
+        Ok(())
+    }
 
-    // require_eq!(1,2);
+    #[access_control(ctx.accounts.validate())]
+    pub fn user_claim_handle(ctx: Context<Self>, claim_type: ClaimType) -> Result<()> {
+        let claim_account = &mut ctx.accounts.claim_account;
+        let user = &mut ctx.accounts.user;
 
-    let amount = claim_account.get_claim_amount(claimer.key(), current);
-    require_gt!(amount, 0, LockerErrors::NothingToClaim);
+        let current = Clock::get().unwrap().unix_timestamp as u64;
+        msg!("Current: {:}", current);
 
-    //transfer UNP from locker to claimer
-    let token_mint = &mut ctx.accounts.token_mint;
-    msg!(
-        "Tranfer {:} {:} to {:}",
-        amount,
-        token_mint.key(),
-        claimer.key()
-    );
+        let (index, amount) = claim_account.get_claim_info(user.key(), current);
+        require_gt!(amount, 0, LockerErrors::NothingToClaim);
 
-    let seeds: &[&[u8]] = &[LOCKER_ACCOUNT, &[locker.bump]];
-    let signer = &[&seeds[..]];
+        //transfer UNP from locker to user
+        // let token_mint = &mut ctx.accounts.token_mint;
+        // msg!(
+        //     "Tranfer {:} {:} to {:}",
+        //     amount,
+        //     token_mint.key(),
+        //     user.key()
+        // );
 
-    transfer(
-        CpiContext::new(
-            ctx.accounts.token_program.to_account_info(),
-            SplTransfer {
-                authority: locker.to_account_info(),
-                from: ctx.accounts.locker_ata.to_account_info(),
-                to: ctx.accounts.claim_ata.to_account_info(),
-            },
-        )
-        .with_signer(signer),
-        amount,
-    )?;
+        let seeds: &[&[u8]] = &[claim_type.get_seeds(), &[claim_account.bump]];
+        let signer = &[&seeds[..]];
 
-    //update claim account
-    claim_account.claim_data[index].released += amount;
+        transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                SplTransfer {
+                    authority: claim_account.to_account_info(),
+                    from: ctx.accounts.claim_ata.to_account_info(),
+                    to: ctx.accounts.user_ata.to_account_info(),
+                },
+            )
+            .with_signer(signer),
+            amount,
+        )?;
 
-    emit!(UserClaimEvent {
-        claim_type,
-        claimer: claimer.key(),
-        amount: amount,
-        time: current
-    });
+        //update claim account
+        claim_account.claim_data[index].released += amount;
 
-    Ok(())
+        emit!(UserClaimEvent {
+            claim_type,
+            claimer: user.key(),
+            amount: amount,
+            time: current
+        });
+
+        Ok(())
+    }
 }

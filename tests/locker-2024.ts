@@ -45,121 +45,91 @@ describe("locker-2024", () => {
     const seed_round_account = getClaimAccount("SEED_ROUND_ACCOUNT");
     const seed_round_user = await create_user();
 
-    const private_round_account = getClaimAccount("PRIVATE_ROUND_ACCOUNT");
-    const private_round__user = await create_user();
+    // const private_round_account = getClaimAccount("PRIVATE_ROUND_ACCOUNT");
+    // const private_round__user = await create_user();
 
-    const public_sale_account = getClaimAccount("PUBLIC_SALE_ACCOUNT");
-    const public_sale_user = await create_user();
+    // const public_sale_account = getClaimAccount("PUBLIC_SALE_ACCOUNT");
+    // const public_sale_user = await create_user();
 
-    const founding_team_account = getClaimAccount("FOUNDING_TEAM_ACCOUNT");
-    const founding_team_user = await create_user();
+    // const founding_team_account = getClaimAccount("FOUNDING_TEAM_ACCOUNT");
+    // const founding_team_user = await create_user();
 
-    const advisors_account = getClaimAccount("ADVISORS_ACCOUNT");
-    const advisors_user = await create_user();
+    // const advisors_account = getClaimAccount("ADVISORS_ACCOUNT");
+    // const advisors_user = await create_user();
 
-    const treasury_account = getClaimAccount("TREASURY_ACCOUNT");
-    const treasury_user = await create_user();
+    // const treasury_account = getClaimAccount("TREASURY_ACCOUNT");
+    // const treasury_user = await create_user();
 
-    const ecosystem_account = getClaimAccount("ECOSYSTEM_ACCOUNT");
-    const ecosystem_user = await create_user();
+    // const ecosystem_account = getClaimAccount("ECOSYSTEM_ACCOUNT");
+    // const ecosystem_user = await create_user();
 
     const unp = await createMint(conn, payer, owner.publicKey, null, 6);
     console.log("UNP: ", unp.toString());
     try {
       await program.methods
-        .init(unp)
+        .init()
         .accounts({
           locker: locker_account,
           adminAccount: admin_account,
           operatorAccount: operator_account,
-          seedRoundAccount: seed_round_account,
-          privateRoundAccount: private_round_account,
-          publicSaleAccount: public_sale_account,
-          foundingTeamAccount: founding_team_account,
-          advisorsAccount: advisors_account,
-          treasuryAccount: treasury_account,
-          ecosystemAccount: ecosystem_account,
         })
         .rpc();
     } catch (error) {
       console.log(error);
     }
 
-    console.log("------------------MINT UNP TO LOCKER------------------");
-    let locker_unp_account = await getOrCreateAta(
+    console.log("------------------MINT UNP TO OPERATOR------------------");
+    let operator_ata = await getOrCreateAta(
       conn,
       owner.payer,
       unp,
-      locker_account
+      owner.publicKey
     );
-    console.log("LOCKER UNP ACCOUNT: ", locker_unp_account.address.toString());
+    console.log("OPERATOR ATA: ", operator_ata.address.toString());
+
+    let seed_round_account_ata = await getAssociatedTokenAddress(
+      unp,
+      seed_round_account,
+      true
+    );
+
+    console.log("SEED ROUND ATA: ", seed_round_account_ata.toString());
 
     await mintTo(
       conn,
       owner.payer,
       unp,
-      locker_unp_account.address,
+      operator_ata.address,
       payer,
       BigInt(920 * 10 ** 6 * 10 ** 6)
     );
 
-    let locker_unp_balance = await conn.getTokenAccountBalance(
-      locker_unp_account.address
+    let operator_unp_balance = await conn.getTokenAccountBalance(
+      operator_ata.address
     );
     console.log(
       "LOCKER UNP BALANCE: ",
-      locker_unp_balance.value.amount.toString()
+      operator_unp_balance.value.amount.toString()
     );
 
     try {
-      await program.methods
+      const tx = await program.methods
         .setClaim(
+          { seedRound: {} },
+          2,
+          18,
+          750,
+          unp,
           [seed_round_user.publicKey],
-          [new anchor.BN(60 * 10 ** 6 * 10 ** 6)],
-          [private_round__user.publicKey],
-          [new anchor.BN(120 * 10 ** 6 * 10 ** 6)],
-          [public_sale_user.publicKey],
-          [new anchor.BN(150 * 10 ** 6 * 10 ** 6)],
-          [founding_team_user.publicKey],
-          [new anchor.BN(120 * 10 ** 6 * 10 ** 6)],
-          [advisors_user.publicKey],
-          [new anchor.BN(30 * 10 ** 6 * 10 ** 6)],
-          [treasury_user.publicKey],
-          [new anchor.BN(140 * 10 ** 6 * 10 ** 6)],
-          [ecosystem_user.publicKey],
-          [new anchor.BN(300 * 10 ** 6 * 10 ** 6)]
+          [new anchor.BN(60 * 10 ** 6 * 10 ** 6)]
         )
         .accounts({
           locker: locker_account,
           operatorAccount: operator_account,
-          seedRoundAccount: seed_round_account,
-          privateRoundAccount: private_round_account,
-          publicSaleAccount: public_sale_account,
-          foundingTeamAccount: founding_team_account,
-          advisorsAccount: advisors_account,
-          treasuryAccount: treasury_account,
-          ecosystemAccount: ecosystem_account,
-        })
-        .rpc();
-    } catch (error) {
-      console.log(error);
-    }
-
-    console.log("------------------------SET TGE-------------------------");
-    let currenct = Math.floor(new Date().getTime() / 1000) - 2;
-    try {
-      await program.methods
-        .setTge(new anchor.BN(currenct))
-        .accounts({
-          locker: locker_account,
-          operatorAccount: operator_account,
-          seedRoundAccount: seed_round_account,
-          privateRoundAccount: private_round_account,
-          publicSaleAccount: public_sale_account,
-          foundingTeamAccount: founding_team_account,
-          advisorsAccount: advisors_account,
-          treasuryAccount: treasury_account,
-          ecosystemAccount: ecosystem_account,
+          operatorAta: operator_ata.address,
+          claimAta: seed_round_account_ata,
+          claimAccount: seed_round_account,
+          mint: unp,
         })
         .rpc();
     } catch (error) {
@@ -171,41 +141,68 @@ describe("locker-2024", () => {
     );
     console.log(seed_round_account_info);
 
-    console.log(
-      "------------------------TEST SEED ROUND-------------------------"
-    );
+    console.log("------------------------SET TGE-------------------------");
+    let currenct = Math.floor(new Date().getTime() / 1000) - 2;
 
-    let seed_round_unp_ata = await getAta(unp, seed_round_user.publicKey);
-    console.log("SEED ROUND ATA: ", seed_round_unp_ata.toString());
+    // try {
+    //   await program.methods
+    //     .setTge(new anchor.BN(currenct))
+    //     .accounts({
+    //       locker: locker_account,
+    //       operatorAccount: operator_account,
+    //       seedRoundAccount: seed_round_account,
+    //       privateRoundAccount: private_round_account,
+    //       publicSaleAccount: public_sale_account,
+    //       foundingTeamAccount: founding_team_account,
+    //       advisorsAccount: advisors_account,
+    //       treasuryAccount: treasury_account,
+    //       ecosystemAccount: ecosystem_account,
+    //     })
+    //     .rpc();
+    // } catch (error) {
+    //   console.log(error);
+    // }
 
-    try {
-      await program.methods
-        .userClaim({ seedRound: {} })
-        .accounts({
-          locker: locker_account,
-          claimAccount: seed_round_account,
-          claimer: seed_round_user.publicKey,
-          lockerAta: locker_unp_account.address,
-          claimAta: seed_round_unp_ata,
-          tokenMint: unp,
-        })
-        .signers([seed_round_user])
-        .rpc();
-    } catch (error) {
-      console.log(error);
-    }
+    // let seed_round_account_info = await program.account.claim.fetch(
+    //   seed_round_account
+    // );
+    // console.log(seed_round_account_info);
 
-    seed_round_account_info = await program.account.claim.fetch(
-      seed_round_account
-    );
+    // console.log(
+    //   "------------------------TEST SEED ROUND-------------------------"
+    // );
 
-    console.log(seed_round_account_info.claimData[0].released.toNumber());
+    // let seed_round_unp_ata = await getAta(unp, seed_round_user.publicKey);
+    // console.log("SEED ROUND ATA: ", seed_round_unp_ata.toString());
 
-    let seed_round_unp_balance = await conn.getTokenAccountBalance(
-      seed_round_unp_ata
-    );
+    // try {
+    //   await program.methods
+    //     .userClaim({ seedRound: {} })
+    //     .accounts({
+    //       locker: locker_account,
+    //       claimAccount: seed_round_account,
+    //       claimer: seed_round_user.publicKey,
+    //       lockerAta: operator_ata.address,
+    //       claimAta: seed_round_unp_ata,
+    //       tokenMint: unp,
+    //     })
+    //     .signers([seed_round_user])
+    //     .rpc();
+    // } catch (error) {
+    //   console.log(error);
+    // }
 
-    console.log(seed_round_unp_balance.value.amount)
+    // seed_round_account_info = await program.account.claim.fetch(
+    //   seed_round_account
+    // );
+
+    // console.log(seed_round_account_info.claimData[0].released.toNumber());
+
+    // let seed_round_unp_balance = await conn.getTokenAccountBalance(
+    //   seed_round_unp_ata
+    // );
+
+    // console.log(seed_round_unp_balance.value.amount)
   });
 
   const getLockerAccount = () => {

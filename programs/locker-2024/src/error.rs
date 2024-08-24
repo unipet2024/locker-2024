@@ -20,6 +20,9 @@ pub enum LockerErrors {
     #[msg("Locker closed")]
     LockerClosed,
 
+    #[msg("TGE setup already")]
+    TgeSetupAlready,
+
     #[msg("Admin account invalid")]
     AdminAccountInvalid,
 
@@ -34,6 +37,10 @@ pub enum LockerErrors {
 
     #[msg("Operator not change")]
     OperatorNotChange,
+
+    #[msg("Not start yet")]
+    NotStartYet,
+    
 }
 
 impl From<LockerErrors> for ProgramError {

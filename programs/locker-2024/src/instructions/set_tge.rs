@@ -1,13 +1,12 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    AuthRole, AuthorityRole, Claim, Locker, LockerErrors, ADVISORS_ACCOUNT, ECOSYSTEM_ACCOUNT,
-    FOUNDING_TEAM_ACCOUNT, LOCKER_ACCOUNT, OPERATOR_ROLE, PRIVATE_ROUND_ACCOUNT,
-    PUBLIC_SALE_ACCOUNT, SEED_ROUND_ACCOUNT, TREASURY_ACCOUNT,
+    AuthRole, AuthorityRole, Claim, ClaimType, Locker, LockerErrors, SetTgeEvent, LOCKER_ACCOUNT,
+    OPERATOR_ROLE,
 };
 
 #[derive(Accounts)]
-#[instruction(tge: u64)]
+#[instruction(claim_type:ClaimType,tge: u64)]
 pub struct SetTge<'info> {
     #[account(
         seeds = [LOCKER_ACCOUNT],
@@ -26,87 +25,40 @@ pub struct SetTge<'info> {
 
     #[account(
         mut,
-        seeds = [SEED_ROUND_ACCOUNT],
-        bump=seed_round_account.bump,
+        seeds = [claim_type.get_seeds()],
+        bump,
     )]
-    pub seed_round_account: Account<'info, Claim>,
-
-    #[account(
-        mut,
-        seeds = [PRIVATE_ROUND_ACCOUNT],
-        bump=private_round_account.bump,
-    )]
-    pub private_round_account: Account<'info, Claim>,
-
-    #[account(
-        mut,
-        seeds = [PUBLIC_SALE_ACCOUNT],
-        bump=public_sale_account.bump,
-    )]
-    pub public_sale_account: Account<'info, Claim>,
-
-    #[account(
-        mut,
-        seeds = [FOUNDING_TEAM_ACCOUNT],
-        bump=founding_team_account.bump,
-    )]
-    pub founding_team_account: Account<'info, Claim>,
-
-    #[account(
-        mut,
-        seeds = [ADVISORS_ACCOUNT],
-        bump=advisors_account.bump,
-    )]
-    pub advisors_account: Account<'info, Claim>,
-
-    #[account(
-        mut,
-        seeds = [TREASURY_ACCOUNT],
-        bump=treasury_account.bump,
-    )]
-    pub treasury_account: Account<'info, Claim>,
-
-    #[account(
-        mut,
-        seeds = [ECOSYSTEM_ACCOUNT],
-        bump=ecosystem_account.bump,
-    )]
-    pub ecosystem_account: Account<'info, Claim>,
+    pub claim_account: Account<'info, Claim>,
 
     #[account(mut, signer)]
     pub operator: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 
-pub fn set_tge_handle(ctx: Context<SetTge>, tge: u64) -> Result<()> {
-    // SET SEED ROUND CLAIM
+impl SetTge<'_> {
+    fn validate(&self, tge: u64) -> Result<()> {
+        require_eq!(
+            self.claim_account.start_time,
+            0,
+            LockerErrors::TgeSetupAlready
+        );
+        require_gt!(tge, 0, LockerErrors::InputInvalid);
 
-    let seed_round_account = &mut ctx.accounts.seed_round_account;
-    seed_round_account.set_tge(tge)?;
+        Ok(())
+    }
 
-    //SET PRIVATE ROUND CLAIM
-    let private_round_account = &mut ctx.accounts.private_round_account;
-    private_round_account.set_tge(tge)?;
+    #[access_control(ctx.accounts.validate(tge))]
+    pub fn set_tge_handle(ctx: Context<Self>, claim_type: ClaimType, tge: u64) -> Result<()> {
+        let claim_account = &mut ctx.accounts.claim_account;
 
-    //SET PUBLIC SALE CLAIM
-    let public_sale_account = &mut ctx.accounts.public_sale_account;
-    public_sale_account.set_tge(tge)?;
+        claim_account.set_tge(tge)?;
+        emit!(SetTgeEvent {
+            claim_type,
+            operator: ctx.accounts.operator.key(),
+            tge,
+            time: Clock::get().unwrap().unix_timestamp
+        });
 
-    //SET FOUNDING CLAIM
-    let founding_team_account = &mut ctx.accounts.founding_team_account;
-    founding_team_account.set_tge(tge)?;
-
-    //SET ADVISORS CLAIM
-    let advisors_account = &mut ctx.accounts.advisors_account;
-    advisors_account.set_tge(tge)?;
-
-    //SET TREASURY CLAIM
-    let treasury_account = &mut ctx.accounts.treasury_account;
-    treasury_account.set_tge(tge)?;
-
-    //SET ECOSYSTEM CLAIM
-    let ecosystem_account = &mut ctx.accounts.ecosystem_account;
-    ecosystem_account.set_tge(tge)?;
-
-    Ok(())
+        Ok(())
+    }
 }
